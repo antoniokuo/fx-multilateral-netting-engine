@@ -58,3 +58,23 @@ def test_transaction_rejects_self_debt():
             currency="GBP",
             amount=Decimal("50.00"),
         )
+
+
+def test_transaction_rejects_invalid_currency_format():
+    """
+    Test that the system enforces strict 3-letter uppercase ISO 4217 currency codes.
+    """
+    invalid_currencies = ["gbp", "US DOLLAR", "EUR ", "123", "UK"]
+
+    for bad_currency in invalid_currencies:
+        with pytest.raises(
+            ValueError, match="Currency must be a 3-letter uppercase string"
+        ):
+            Transaction(
+                id="tx-error-3",
+                timestamp=datetime.now(timezone.utc),
+                debtor="Alice",
+                creditor="Bob",
+                currency=bad_currency,
+                amount=Decimal("50.00"),
+            )

@@ -18,3 +18,11 @@ class Transaction:
 
         if self.debtor == self.creditor:
             raise ValueError("Debtor and creditor cannot be the same entity")
+
+        if (
+            not isinstance(self.currency, str)
+            or len(self.currency) != 3
+            or not self.currency.isupper()
+            or not self.currency.isalpha()
+        ):
+            raise ValueError("Currency must be a 3-letter uppercase string")
