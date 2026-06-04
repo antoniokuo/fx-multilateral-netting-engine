@@ -4,8 +4,7 @@ from decimal import Decimal
 import pytest
 
 # We are importing a function from the engine that does not exist yet.
-from src.engine import calculate_net_balances
-
+from src.engine import calculate_net_balances, route_settlement
 from src.models import Transaction
 
 
@@ -55,3 +54,32 @@ def test_calculate_net_balances_resolves_complex_graph():
 
     # Mathematical property constraint: The system must be perfectly zero-sum
     assert sum(balances.values()) == Decimal("0.00")
+
+
+def test_route_settlement_transactions():
+    """
+    Test that the engine resolves a net balance dictionary into the absolute
+    minimum number of settlement transactions.
+    """
+    # 1. Arrange: The absolute state of the network
+    balances = {
+        "Alice": Decimal("-30.00"),
+        "Bob": Decimal("40.00"),
+        "Charlie": Decimal("-10.00"),
+    }
+
+    # 2. Act: Execute the minimum cash flow routing
+    # We pass "GBP" to enforce the currency of the output transactions
+    settlements = route_settlement(balances, currency="GBP")
+
+    # 3. Assert: Mathematical verification
+    # For 3 entities, the maximum number of optimal transactions is V - 1 = 2
+    assert len(settlements) <= 2
+
+    # We prove the algorithm worked by passing its output back into our first function.
+    # The net balances of the settlement transactions MUST perfectly match the initial debt.
+    net_settled = calculate_net_balances(settlements)
+
+    assert net_settled["Alice"] == Decimal("-30.00")
+    assert net_settled["Bob"] == Decimal("40.00")
+    assert net_settled["Charlie"] == Decimal("-10.00")
