@@ -1,3 +1,4 @@
+import logging
 import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -6,12 +7,19 @@ from typing import Dict, List
 
 from src.models import Transaction
 
+# Initialise the module-level logger
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO, format="[%(levelname)s] %(asctime)s - %(name)s: %(message)s"
+)
+
 
 def calculate_net_balances(transactions: List[Transaction]) -> Dict[str, Decimal]:
     """
     Aggregates a list of transactions into a net balance dictionary.
     Time Complexity: O(N) where N is the number of transactions.
     """
+    logger.info(f"Calculating net balances for {len(transactions)} transactions.")
     # defaultdict automatically initialises missing keys with Decimal("0")
     balances: Dict[str, Decimal] = defaultdict(Decimal)
 
@@ -28,6 +36,9 @@ def route_settlement(balances: Dict[str, Decimal], currency: str) -> List[Transa
     Resolves a net balance dictionary into the minimum number of transactions
     using a greedy minimum cash flow algorithm.
     """
+    logger.info(
+        f"Initiating minimum cash flow routing for {len(balances)} active entities."
+    )
     # 1. Partitioning: Separate entities into debtors and creditors.
     # Ignore anyone with a balance of exactly Decimal("0").
     # Store them as lists of lists: [[entity_name, absolute_amount], ...]
@@ -62,6 +73,10 @@ def route_settlement(balances: Dict[str, Decimal], currency: str) -> List[Transa
         creditor_name, creditor_amount = creditors[creditor_idx]
 
         settlement_amount = min(debtor_amount, creditor_amount)
+
+        logger.debug(
+            f"Routing {settlement_amount} {currency} from {debtor_name} to {creditor_name}"
+        )
 
         new_transaction = Transaction(
             id=str(uuid.uuid4()),
