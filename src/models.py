@@ -1,3 +1,4 @@
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -13,6 +14,11 @@ class Transaction:
     amount: Decimal
 
     def __post_init__(self) -> None:
+        try:
+            uuid.UUID(str(self.id), version=4)
+        except ValueError:
+            raise ValueError("Transaction ID must be a valid UUIDv4 string")
+
         if self.timestamp.tzinfo is None:
             raise ValueError("Timestamp must be timezone-aware")
 

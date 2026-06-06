@@ -87,7 +87,8 @@ def route_settlement(balances: Dict[str, Decimal], currency: str) -> List[Transa
         settlement_amount = min(debtor_amount, creditor_amount)
 
         logger.debug(
-            f"Routing {settlement_amount} {currency} from {debtor_name} to {creditor_name}"
+            f"Routing {settlement_amount} {currency} "
+            f"from {debtor_name} to {creditor_name}"
         )
 
         new_transaction = Transaction(

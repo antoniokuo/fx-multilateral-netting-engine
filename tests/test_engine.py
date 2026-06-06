@@ -2,8 +2,6 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
-import pytest
-
 from src.engine import calculate_net_balances, route_settlement
 from src.models import Transaction
 
@@ -106,3 +104,31 @@ def test_route_settlement_transactions() -> None:
     assert net_settled["GBP"]["Alice"] == Decimal("-30.00")
     assert net_settled["GBP"]["Bob"] == Decimal("40.00")
     assert net_settled["GBP"]["Charlie"] == Decimal("-10.00")
+
+
+def test_calculate_net_balances_handles_empty_ledger() -> None:
+    """
+    Test that an empty ledger safely returns an empty dictionary, not an error.
+    """
+    balances = calculate_net_balances([])
+    assert balances == {}
+
+
+def test_calculate_net_balances_handles_asymmetrical_graph() -> None:
+    """
+    Test a one-way debt graph where capital flows out but not in.
+    """
+    tx1 = Transaction(
+        id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc),
+        debtor="Alice",
+        creditor="Bob",
+        currency="GBP",
+        amount=Decimal("50.00"),
+    )
+
+    balances = calculate_net_balances([tx1])
+
+    assert balances["GBP"]["Alice"] == Decimal("-50.00")
+    assert balances["GBP"]["Bob"] == Decimal("50.00")
+    assert sum(balances["GBP"].values()) == Decimal("0.00")
