@@ -13,6 +13,9 @@ class Transaction:
     amount: Decimal
 
     def __post_init__(self) -> None:
+        if self.timestamp.tzinfo is None:
+            raise ValueError("Timestamp must be timezone-aware")
+
         if self.amount <= Decimal("0"):
             raise ValueError("Amount must be strictly positive")
 

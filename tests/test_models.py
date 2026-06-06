@@ -78,3 +78,21 @@ def test_transaction_rejects_invalid_currency_format() -> None:
                 currency=bad_currency,
                 amount=Decimal("50.00"),
             )
+
+
+def test_transaction_rejects_naive_datetime() -> None:
+    """
+    Test that the system violently rejects naive datetimes lacking timezone data.
+    """
+    # Generate a naive datetime (no timezone attached)
+    naive_dt = datetime.now()
+
+    with pytest.raises(ValueError, match="Timestamp must be timezone-aware"):
+        Transaction(
+            id="tx-error-4",
+            timestamp=naive_dt,
+            debtor="Alice",
+            creditor="Bob",
+            currency="GBP",
+            amount=Decimal("50.00"),
+        )
