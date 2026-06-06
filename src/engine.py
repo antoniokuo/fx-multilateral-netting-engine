@@ -14,21 +14,33 @@ logging.basicConfig(
 )
 
 
-def calculate_net_balances(transactions: List[Transaction]) -> Dict[str, Decimal]:
+def calculate_net_balances(
+    transactions: List[Transaction],
+) -> Dict[str, Dict[str, Decimal]]:
     """
-    Aggregates a list of transactions into a net balance dictionary.
+    Aggregates a list of transactions into a net balance dictionary grouped by currency.
+    Returns: Dict[currency, Dict[entity, net_balance]]
     Time Complexity: O(N) where N is the number of transactions.
     """
     logger.info(f"Calculating net balances for {len(transactions)} transactions.")
-    # defaultdict automatically initialises missing keys with Decimal("0")
-    balances: Dict[str, Decimal] = defaultdict(Decimal)
+
+    # Outer dict maps Currency -> Inner dict (Entity -> Balance)
+    balances: Dict[str, Dict[str, Decimal]] = {}
 
     for tx in transactions:
-        balances[tx.debtor] -= tx.amount
-        balances[tx.creditor] += tx.amount
+        # Initialise the currency graph if it doesn't exist
+        if tx.currency not in balances:
+            balances[tx.currency] = defaultdict(Decimal)
 
-    # Convert back to a standard dictionary to satisfy the strict return type
-    return dict(balances)
+        # Execute the zero-sum math within the isolated currency boundary
+        balances[tx.currency][tx.debtor] -= tx.amount
+        balances[tx.currency][tx.creditor] += tx.amount
+
+    # Convert the inner defaultdicts back to standard dicts for strict type compliance
+    return {
+        currency: dict(entity_balances)
+        for currency, entity_balances in balances.items()
+    }
 
 
 def route_settlement(balances: Dict[str, Decimal], currency: str) -> List[Transaction]:

@@ -1,9 +1,9 @@
+import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
 
-# We are importing a function from the engine that does not exist yet.
 from src.engine import calculate_net_balances, route_settlement
 from src.models import Transaction
 
@@ -13,9 +13,8 @@ def test_calculate_net_balances_resolves_complex_graph() -> None:
     Test that the engine accurately aggregates a sequence of directed edges
     into a zero-sum net balance dictionary.
     """
-    # 1. Arrange: Create a web of transactions
     tx1 = Transaction(
-        id="tx-1",
+        id=str(uuid.uuid4()),
         timestamp=datetime.now(timezone.utc),
         debtor="Alice",
         creditor="Bob",
@@ -23,7 +22,7 @@ def test_calculate_net_balances_resolves_complex_graph() -> None:
         amount=Decimal("50.00"),
     )
     tx2 = Transaction(
-        id="tx-2",
+        id=str(uuid.uuid4()),
         timestamp=datetime.now(timezone.utc),
         debtor="Charlie",
         creditor="Alice",
@@ -31,7 +30,7 @@ def test_calculate_net_balances_resolves_complex_graph() -> None:
         amount=Decimal("20.00"),
     )
     tx3 = Transaction(
-        id="tx-3",
+        id=str(uuid.uuid4()),
         timestamp=datetime.now(timezone.utc),
         debtor="Bob",
         creditor="Charlie",
@@ -40,20 +39,49 @@ def test_calculate_net_balances_resolves_complex_graph() -> None:
     )
 
     ledger = [tx1, tx2, tx3]
-
-    # 2. Act: Calculate the absolute state
     balances = calculate_net_balances(ledger)
 
-    # 3. Assert: Verify the exact mathematical state
-    # Alice: -50 (tx1) + 20 (tx2) = -30
-    # Bob: +50 (tx1) - 10 (tx3) = +40
-    # Charlie: -20 (tx2) + 10 (tx3) = -10
-    assert balances["Alice"] == Decimal("-30.00")
-    assert balances["Bob"] == Decimal("40.00")
-    assert balances["Charlie"] == Decimal("-10.00")
+    # Assertions expect the nested currency key
+    assert balances["GBP"]["Alice"] == Decimal("-30.00")
+    assert balances["GBP"]["Bob"] == Decimal("40.00")
+    assert balances["GBP"]["Charlie"] == Decimal("-10.00")
+    assert sum(balances["GBP"].values()) == Decimal("0.00")
 
-    # Mathematical property constraint: The system must be perfectly zero-sum
-    assert sum(balances.values()) == Decimal("0.00")
+
+def test_calculate_net_balances_isolates_multiple_currencies() -> None:
+    """
+    Test that the engine strictly partitions balances by currency,
+    preventing catastrophic cross-currency arithmetic.
+    """
+    tx1 = Transaction(
+        id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc),
+        debtor="Alice",
+        creditor="Bob",
+        currency="GBP",
+        amount=Decimal("50.00"),
+    )
+    tx2 = Transaction(
+        id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc),
+        debtor="Bob",
+        creditor="Alice",
+        currency="EUR",
+        amount=Decimal("40.00"),
+    )
+
+    ledger = [tx1, tx2]
+    balances = calculate_net_balances(ledger)
+
+    # GBP Graph
+    assert balances["GBP"]["Alice"] == Decimal("-50.00")
+    assert balances["GBP"]["Bob"] == Decimal("50.00")
+    assert sum(balances["GBP"].values()) == Decimal("0.00")
+
+    # EUR Graph
+    assert balances["EUR"]["Bob"] == Decimal("-40.00")
+    assert balances["EUR"]["Alice"] == Decimal("40.00")
+    assert sum(balances["EUR"].values()) == Decimal("0.00")
 
 
 def test_route_settlement_transactions() -> None:
@@ -61,25 +89,20 @@ def test_route_settlement_transactions() -> None:
     Test that the engine resolves a net balance dictionary into the absolute
     minimum number of settlement transactions.
     """
-    # 1. Arrange: The absolute state of the network
-    balances = {
+    # The routing engine still accepts a flat dictionary for a SINGLE currency
+    single_currency_balances = {
         "Alice": Decimal("-30.00"),
         "Bob": Decimal("40.00"),
         "Charlie": Decimal("-10.00"),
     }
 
-    # 2. Act: Execute the minimum cash flow routing
-    # We pass "GBP" to enforce the currency of the output transactions
-    settlements = route_settlement(balances, currency="GBP")
+    settlements = route_settlement(single_currency_balances, currency="GBP")
 
-    # 3. Assert: Mathematical verification
-    # For 3 entities, the maximum number of optimal transactions is V - 1 = 2
     assert len(settlements) <= 2
 
-    # We prove the algorithm worked by passing its output back into our first function.
-    # The net balances of the settlement transactions MUST perfectly match the initial debt.
+    # Recalculating the net of the settlements will yield a nested dictionary
     net_settled = calculate_net_balances(settlements)
 
-    assert net_settled["Alice"] == Decimal("-30.00")
-    assert net_settled["Bob"] == Decimal("40.00")
-    assert net_settled["Charlie"] == Decimal("-10.00")
+    assert net_settled["GBP"]["Alice"] == Decimal("-30.00")
+    assert net_settled["GBP"]["Bob"] == Decimal("40.00")
+    assert net_settled["GBP"]["Charlie"] == Decimal("-10.00")
