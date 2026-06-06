@@ -7,7 +7,7 @@ import pytest
 from src.models import Transaction
 
 
-def test_transaction_instantiates_with_valid_data():
+def test_transaction_instantiates_with_valid_data() -> None:
     """
     Test that a Transaction object can be created with strict types.
     """
@@ -28,7 +28,7 @@ def test_transaction_instantiates_with_valid_data():
     assert tx.currency == "GBP"
 
 
-def test_transaction_rejects_zero_or_negative_amount():
+def test_transaction_rejects_zero_or_negative_amount() -> None:
     """
     Test that the system violently rejects non-positive financial amounts.
     """
@@ -43,7 +43,7 @@ def test_transaction_rejects_zero_or_negative_amount():
         )
 
 
-def test_transaction_rejects_self_debt():
+def test_transaction_rejects_self_debt() -> None:
     """
     Test that a node cannot have a directed edge to itself.
     """
@@ -60,7 +60,7 @@ def test_transaction_rejects_self_debt():
         )
 
 
-def test_transaction_rejects_invalid_currency_format():
+def test_transaction_rejects_invalid_currency_format() -> None:
     """
     Test that the system enforces strict 3-letter uppercase ISO 4217 currency codes.
     """

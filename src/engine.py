@@ -3,7 +3,7 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from src.models import Transaction
 
@@ -43,14 +43,14 @@ def route_settlement(balances: Dict[str, Decimal], currency: str) -> List[Transa
     # Ignore anyone with a balance of exactly Decimal("0").
     # Store them as lists of lists: [[entity_name, absolute_amount], ...]
     # Example: debtors = [["Alice", Decimal("30.00")], ["Charlie", Decimal("10.00")]]
-    debtors = []
-    creditors = []
+    debtors: List[Tuple[str, Decimal]] = []
+    creditors: List[Tuple[str, Decimal]] = []
 
     for entity, balance in balances.items():
         if balance < Decimal("0"):
-            debtors.append([entity, abs(balance)])
+            debtors.append((entity, abs(balance)))
         elif balance > Decimal("0"):
-            creditors.append([entity, balance])
+            creditors.append((entity, balance))
 
     # 2. Sorting: Sort both lists in descending order based on the amount.
     # This ensures processing the largest debts and credits first (The Greedy approach).
@@ -89,15 +89,20 @@ def route_settlement(balances: Dict[str, Decimal], currency: str) -> List[Transa
 
         settlements.append(new_transaction)
 
-        # Mutate the balances in place
-        debtors[debtor_idx][1] -= settlement_amount
-        creditors[creditor_idx][1] -= settlement_amount
+        # Calculate new balances
+        new_debtor_amount = debtor_amount - settlement_amount
+        new_creditor_amount = creditor_amount - settlement_amount
+
+        # Reassign immutable tuples back to the array
+        debtors[debtor_idx] = (debtor_name, new_debtor_amount)
+        creditors[creditor_idx] = (creditor_name, new_creditor_amount)
 
         # If a balance hits zero, advance the pointer instead of shifting the array
-        if debtors[debtor_idx][1] == Decimal("0"):
+        # Advance pointers if the balance is zero
+        if new_debtor_amount == Decimal("0"):
             debtor_idx += 1
 
-        if creditors[creditor_idx][1] == Decimal("0"):
+        if new_creditor_amount == Decimal("0"):
             creditor_idx += 1
 
     return settlements

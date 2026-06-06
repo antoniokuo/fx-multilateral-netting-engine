@@ -8,7 +8,7 @@ from src.engine import calculate_net_balances, route_settlement
 from src.models import Transaction
 
 
-def test_calculate_net_balances_resolves_complex_graph():
+def test_calculate_net_balances_resolves_complex_graph() -> None:
     """
     Test that the engine accurately aggregates a sequence of directed edges
     into a zero-sum net balance dictionary.
@@ -56,7 +56,7 @@ def test_calculate_net_balances_resolves_complex_graph():
     assert sum(balances.values()) == Decimal("0.00")
 
 
-def test_route_settlement_transactions():
+def test_route_settlement_transactions() -> None:
     """
     Test that the engine resolves a net balance dictionary into the absolute
     minimum number of settlement transactions.
