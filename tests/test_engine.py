@@ -2,7 +2,12 @@ import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from src.engine import calculate_net_balances, route_settlement
+from src.engine import (
+    calculate_global_net_balances,
+    calculate_net_balances,
+    route_settlement,
+)
+from src.fx import StaticFXProvider
 from src.models import Transaction
 
 
@@ -132,3 +137,35 @@ def test_calculate_net_balances_handles_asymmetrical_graph() -> None:
     assert balances["GBP"]["Alice"] == Decimal("-50.00")
     assert balances["GBP"]["Bob"] == Decimal("50.00")
     assert sum(balances["GBP"].values()) == Decimal("0.00")
+
+
+def test_calculate_global_net_balances_cross_currency() -> None:
+    """
+    Test that the engine mathematically collapses a multi-currency partitioned graph
+    into a zero-sum, single base-currency ledger using an injected FX Strategy.
+    """
+    # 1. Arrange: The partitioned multi-currency state
+    partitioned_balances = {
+        "GBP": {"Alice": Decimal("-100.00"), "Bob": Decimal("100.00")},
+        "EUR": {"Alice": Decimal("125.00"), "Bob": Decimal("-125.00")},
+    }
+
+    # 2. Arrange: The Deterministic FX Strategy
+    # We enforce exact ratios to avoid rounding drift during the test
+    rates = {
+        ("EUR", "GBP"): Decimal("0.80"),  # €1.00 = £0.80
+        ("GBP", "EUR"): Decimal("1.25"),  # £1.00 = €1.25
+    }
+    provider = StaticFXProvider(rates)
+
+    # 3. Act: Collapse the graph into a GBP base currency
+    global_balances = calculate_global_net_balances(
+        partitioned_balances, provider, base_currency="GBP"
+    )
+
+    # 4. Assert: Mathematical Verification
+    # Alice owes £100 but is owed €125.
+    # €125 * 0.80 = £100.
+    # Alice's debt and credit perfectly annihilate each other.
+    assert global_balances["Alice"] == Decimal("0.00")
+    assert global_balances["Bob"] == Decimal("0.00")

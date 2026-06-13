@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, List, Tuple
 
+from src.fx import FXProvider
 from src.models import Transaction
 
 # Initialise the module-level logger
@@ -41,6 +42,39 @@ def calculate_net_balances(
         currency: dict(entity_balances)
         for currency, entity_balances in balances.items()
     }
+
+
+def calculate_global_net_balances(
+    partitioned_balances: Dict[str, Dict[str, Decimal]],
+    fx_provider: FXProvider,
+    base_currency: str,
+) -> Dict[str, Decimal]:
+    """
+    Collapses a multi-currency partitioned graph into a single base-currency ledger.
+    Applies strict 2-place Decimal quantization to prevent floating-point drift.
+    """
+    logger.info(f"Collapsing multi-currency graph into base currency: {base_currency}")
+
+    global_balances: Dict[str, Decimal] = defaultdict(Decimal)
+
+    # Financial standard: 2 decimal places.
+    # .quantize() defaults to ROUND_HALF_EVEN (Banker's Rounding).
+    cent_precision = Decimal("0.01")
+
+    for currency, entity_balances in partitioned_balances.items():
+        # Get the rate from the current ledger's currency TO the target base currency
+        rate = fx_provider.get_rate(
+            base_currency=currency, target_currency=base_currency
+        )
+
+        logger.debug(f"Applying FX rate {rate} for {currency} -> {base_currency}")
+
+        for entity, balance in entity_balances.items():
+            # Multiply and immediately round to eliminate sub-cent fractions
+            converted_balance = (balance * rate).quantize(cent_precision)
+            global_balances[entity] += converted_balance
+
+    return dict(global_balances)
 
 
 def route_settlement(balances: Dict[str, Decimal], currency: str) -> List[Transaction]:
