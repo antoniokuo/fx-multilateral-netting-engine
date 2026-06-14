@@ -153,3 +153,22 @@ def route_settlement(balances: Dict[str, Decimal], currency: str) -> List[Transa
             creditor_idx += 1
 
     return settlements
+
+
+def export_to_graphviz(transactions: List[Transaction]) -> str:
+    """
+    Parses the transaction ledger and generates a Graphviz .dot syntax string.
+    Used for visual topology mapping of supply chain and debt networks.
+    """
+    lines = ["digraph NettingEngine {"]
+    lines.append("    rankdir=LR;")  # Renders the graph Left-to-Right
+    lines.append("    node [shape=box, style=filled, color=lightgrey];")
+
+    for tx in transactions:
+        # Format: "Debtor" -> "Creditor" [label="Amount Currency"];
+        lines.append(
+            f'    "{tx.debtor}" -> "{tx.creditor}" [label="{tx.amount} {tx.currency}"];'
+        )
+
+    lines.append("}")
+    return "\n".join(lines)

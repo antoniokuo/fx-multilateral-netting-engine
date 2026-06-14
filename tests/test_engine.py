@@ -5,6 +5,7 @@ from decimal import Decimal
 from src.engine import (
     calculate_global_net_balances,
     calculate_net_balances,
+    export_to_graphviz,
     route_settlement,
 )
 from src.fx import StaticFXProvider
@@ -169,3 +170,33 @@ def test_calculate_global_net_balances_cross_currency() -> None:
     # Alice's debt and credit perfectly annihilate each other.
     assert global_balances["Alice"] == Decimal("0.00")
     assert global_balances["Bob"] == Decimal("0.00")
+
+
+def test_export_to_graphviz_generates_valid_dot_syntax() -> None:
+    """
+    Test that the graph export utility correctly maps transactions into
+    Graphviz .dot directed graph syntax.
+    """
+    tx1 = Transaction(
+        id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc),
+        debtor="Supplier_A",
+        creditor="Hub_B",
+        currency="USD",
+        amount=Decimal("5000.00"),
+    )
+    tx2 = Transaction(
+        id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc),
+        debtor="Hub_B",
+        creditor="Plant_C",
+        currency="USD",
+        amount=Decimal("2000.00"),
+    )
+
+    dot_output = export_to_graphviz([tx1, tx2])
+
+    assert "digraph NettingEngine {" in dot_output
+    assert '"Supplier_A" -> "Hub_B" [label="5000.00 USD"];' in dot_output
+    assert '"Hub_B" -> "Plant_C" [label="2000.00 USD"];' in dot_output
+    assert "}" in dot_output
