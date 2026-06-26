@@ -16,3 +16,6 @@ __pycache__/
 .DS_Store
 .DS_Store?
 ._*
+
+# Local Database File
+audit_trail.db
