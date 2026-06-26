@@ -1,18 +1,30 @@
+import json
+from contextlib import asynccontextmanager
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlmodel import Session
 
+from src.database import NettingAudit, create_db_and_tables, get_session
 from src.engine import calculate_net_balances
-from src.models import Transaction
+from src.models import Transaction as DomainTransaction
 
-app = FastAPI(title="Multilateral Netting Engine API")
+# Temporary local cache for Idempotency tracking (RAM-bounded)
+IDEMPOTENCY_CACHE: Dict[str, Dict[str, Any]] = {}
 
-# In-memory Idempotency Cache: Maps Idempotency-Key -> Response Dict
-# In production, this would be a Redis instance.
-idempotency_cache: Dict[str, Dict[str, Any]] = {}
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Handles application startup and shutdown lifecycle tasks."""
+    create_db_and_tables()
+    yield
+    IDEMPOTENCY_CACHE.clear()
+
+
+app = FastAPI(title="FX Multilateral Netting Engine API", lifespan=lifespan)
 
 
 # --- Pydantic Data Transfer Objects (DTOs) ---
@@ -22,41 +34,38 @@ class TransactionInput(BaseModel):
     debtor: str
     creditor: str
     currency: str = Field(..., min_length=3, max_length=3)
-    amount: str  # Passed as string to preserve precision before Decimal conversion
+    amount: str
 
 
-class NettingPayload(BaseModel):
-    transactions: List[TransactionInput]
+class NettingRequest(BaseModel):
     base_currency: str
+    transactions: List[TransactionInput]
 
 
 # --- HTTP Endpoints ---
 @app.post("/api/v1/netting/clear")
-async def clear_network(
-    payload: NettingPayload,
+async def clear_ledger(
+    payload: NettingRequest,
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    db: Session = Depends(get_session),
 ) -> Dict[str, Any]:
     """
-    Accepts a JSON ledger, translates it to internal domain models,
-    and returns the optimized net balances. Enforces idempotency via headers.
+    Ingests a ledger, executes the netting algorithm, persists the result
+    to an immutable audit trail, and returns the optimised graph.
     """
     if not idempotency_key:
-        raise HTTPException(
-            status_code=400, detail="Idempotency-Key header is strictly required."
-        )
+        raise HTTPException(status_code=400, detail="Missing Idempotency-Key")
 
     # 1. Idempotency Firewall
-    if idempotency_key in idempotency_cache:
-        return idempotency_cache[idempotency_key]
+    if idempotency_key in IDEMPOTENCY_CACHE:
+        return IDEMPOTENCY_CACHE[idempotency_key]
 
-    # 2. Domain Translation (Pydantic -> Internal Models)
+    # 2. Domain Translation
     internal_ledger = []
     for t in payload.transactions:
         try:
-            tx = Transaction(
+            tx = DomainTransaction(
                 id=t.id,
-                # FastAPI parses ISO8601 strings into
-                # timezone-aware datetimes automatically
                 timestamp=t.timestamp,
                 debtor=t.debtor,
                 creditor=t.creditor,
@@ -65,29 +74,42 @@ async def clear_network(
             )
             internal_ledger.append(tx)
         except ValueError as e:
-            raise HTTPException(
-                status_code=400, detail=f"Data Boundary Violation: {str(e)}"
-            )
+            raise HTTPException(status_code=400, detail=str(e))
 
-    # 3. Mathematical Execution
-    net_balances = calculate_net_balances(internal_ledger)
+    try:
+        # 3. Computational Layer
+        netted_balances = calculate_net_balances(internal_ledger)
 
-    # 4. JSON Serialization (Decimals must be cast to strings for HTTP)
-    json_safe_balances = {
-        currency: {entity: str(amount) for entity, amount in entity_balances.items()}
-        for currency, entity_balances in net_balances.items()
-    }
+        # 4. JSON Serialisation
+        json_safe_balances = {
+            currency: {
+                entity: str(amount) for entity, amount in entity_balances.items()
+            }
+            for currency, entity_balances in netted_balances.items()
+        }
 
-    response_data = {
-        "status": "success",
-        "balances": json_safe_balances,
-        "cached": False,
-    }
+        # 5. Persistence Layer (Audit Trail)
+        audit_record = NettingAudit(
+            idempotency_key=idempotency_key,
+            base_currency=payload.base_currency,
+            netted_balances_json=json.dumps(json_safe_balances),
+        )
+        db.add(audit_record)
+        db.commit()
 
-    # 5. Lock the State
-    # We alter the cached payload so future requests visibly identify as cached.
-    cached_response = response_data.copy()
-    cached_response["cached"] = True
-    idempotency_cache[idempotency_key] = cached_response
+        # 6. Cache Layer
+        response_payload: Dict[str, Any] = {
+            "status": "success",
+            "balances": json_safe_balances,
+            "cached": False,
+        }
 
-    return response_data
+        cached_payload = response_payload.copy()
+        cached_payload["cached"] = True
+        IDEMPOTENCY_CACHE[idempotency_key] = cached_payload
+
+        return response_payload
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Execution failure: {str(e)}")

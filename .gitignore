@@ -16,6 +16,3 @@ __pycache__/
 .DS_Store
 .DS_Store?
 ._*
-
-# Private Documentation
-architecture_defense_matrix.md
