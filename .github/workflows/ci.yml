@@ -1,0 +1,49 @@
+name: Enterprise CI Pipeline
+
+# Trigger the pipeline on pushes and pull requests to the main branch
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  security-and-testing-gauntlet:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Check out the code from the repository
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    # 2. Install the correct version of Python
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+        cache: "pip"
+
+    # 3. Install the project dependencies
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        # Install testing tools (in case they aren't in requirements.txt)
+        pip install pytest httpx sqlmodel
+
+    # 4. Enforce Code Style and Syntax Formatting
+    - name: Run Ruff Linter
+      run: |
+        pip install ruff
+        ruff check src tests
+
+    # 5. Enforce Static Typing
+    - name: Run Mypy Type Checker
+      run: |
+        pip install mypy
+        mypy src tests
+
+    # 6. Execute Mathematical and Integration Tests
+    - name: Run Pytest Suite
+      run: |
+        python -m pytest
