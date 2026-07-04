@@ -13,9 +13,9 @@ It is an enterprise-grade, stateful multilateral netting engine designed to opti
 
 ## 🏗️ Core Architectural Capabilities
 
-* **Hexagonal Architecture (Ports & Adapters):** Strictly isolates the pure mathematical domain from external volatility. The FastAPI web layer acts solely as an input port, while the SQLite database functions as an output adapter, ensuring the core $O(N)$ engine remains entirely framework-agnostic.
-* **Linear Graph Routing ($O(N)$):** Abandons traditional memory-shifting array mutations in favour of a strictly typed Two-Pointer Traversal algorithm, ensuring minimal CPU cycle waste.
-* **Autonomous Arbitrage Detection ($O(V \times E)$):** Implements a mathematically transformed Bellman-Ford algorithm, utilising negative natural logarithms (`-math.log(rate)`) to detect risk-free arbitrage loops and structural pricing inefficiencies before execution.
+* **Hexagonal Architecture (Ports & Adapters):** Strictly isolates the pure mathematical domain from external volatility. The FastAPI web layer acts solely as an input port, while the SQLite database functions as an output adapter, ensuring the core O(N) engine remains entirely framework-agnostic.
+* **Linear Graph Routing (O(N)):** Abandons traditional memory-shifting array mutations in favour of a strictly typed Two-Pointer Traversal algorithm, ensuring minimal CPU cycle waste.
+* **Autonomous Arbitrage Detection (O(V × E)):** Implements a mathematically transformed Bellman-Ford algorithm, utilising negative natural logarithms (`-math.log(rate)`) to detect risk-free arbitrage loops and structural pricing inefficiencies before execution.
 * **Ephemeral Execution Log:** Integrates `SQLModel` and `SQLite` to generate a real-time, stateful execution log per container lifecycle. This fulfills structural audit requirements for the duration of the deployment instance, designed to be hot-swapped with a managed cloud database in production.
 * **Cloud-Native Idempotency:** Protects against distributed state failure and duplicate network retries by enforcing strict `Idempotency-Key` headers, physically bypassing the calculation engine if a duplicate state is detected.
 * **Temporal Strategy Pattern:** Abstracts external FX rate APIs via dependency injection, enforcing strict Banker's Rounding (`ROUND_HALF_EVEN`) to eliminate microscopic floating-point precision drift.
@@ -24,12 +24,12 @@ It is an enterprise-grade, stateful multilateral netting engine designed to opti
 
 Algorithmic theory requires physical proof. The engine features a built-in stochastic data generator and hardware profiler (`tracemalloc` and high-resolution `perf_counter`) to verify its physical constraints on legacy consumer hardware (2017 Intel MacBook Air, 8GB RAM).
 
-*Note: Metrics represent pure in-memory algorithmic compute, strictly isolating the $O(N)$ engine from database I/O latency.*
+*Note: Metrics represent pure in-memory algorithmic compute, strictly isolating the O(N) engine from database I/O latency.*
 
 | Metric | Result | System Implication |
 | :--- | :--- | :--- |
 | **Graph Volume** | 1,000,000 edges (transactions) | Capable of ingesting massive, highly fragmented procurement datasets |
-| **Compute Latency** | 5.9 seconds | High-throughput $O(N)$ single-thread execution via Two-Pointer Traversal |
+| **Compute Latency** | 5.9 seconds | High-throughput O(N) single-thread execution single-thread execution via Two-Pointer Traversal |
 | **Peak RAM** | 18.78 MB | Strict memory partitioning preventing cross-currency arithmetic bleed |
 
 ## 🛡️ Enterprise Governance & TDD
