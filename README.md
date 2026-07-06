@@ -36,6 +36,8 @@ Algorithmic theory requires physical proof. The engine features a built-in stoch
 
 This repository enforces strict, automated CI/CD pipeline constraints via GitHub Actions, ensuring the codebase is structurally verified and production-ready before deployment:
 
+![CI/CD Pipeline Verification](docs/assets/pipeline-proof.png)
+
 * **Test-Driven Development (TDD):** A rigorous `pytest` suite enforcing strict financial invariants (Zero-Sum execution, lossless graph reduction, and empty-ledger boundary states).
 * **Static Typing:** `mypy` enforced strictly across all execution paths to prevent runtime type-drift.
 * **Code Formatting:** `ruff` configuration locking PEP-8 standards and syntax integrity.
@@ -109,6 +111,9 @@ uvicorn src.api:app --reload
 ```
 
 ### Live API Testing
+
+![FastAPI Swagger UI Contract](docs/assets/api-contract.png)
+
 Once the local server or Docker container is running, access the interactive Swagger UI documentation at:
 👉 **`http://localhost:8000/docs`**
 
